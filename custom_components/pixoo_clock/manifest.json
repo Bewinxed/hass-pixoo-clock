@@ -1,0 +1,13 @@
+{
+  "domain": "pixoo_clock",
+  "name": "Pixoo Adaptive Clock",
+  "version": "1.0.0",
+  "documentation": "https://github.com/Bewinxed/hass-pixoo-clock",
+  "issue_tracker": "https://github.com/Bewinxed/hass-pixoo-clock/issues",
+  "codeowners": ["@Bewinxed"],
+  "dependencies": [],
+  "requirements": ["Pillow>=10.0.0"],
+  "config_flow": false,
+  "iot_class": "local_push",
+  "integration_type": "hub"
+}
