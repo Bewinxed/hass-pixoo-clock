@@ -229,13 +229,14 @@ class PixooClockLight(LightEntity):
         self._twelve_hour = twelve_hour
 
         self._attr_unique_id = "pixoo_adaptive_clock"
-        self._attr_is_on = True
+        self._attr_is_on = False
         self._brightness = 200
         self._rgb: tuple[int, int, int] = (255, 170, 40)
         self._color_temp_kelvin = 2700
 
         self._last_second = -1
         self._last_color: tuple[int, int, int] | None = None
+        self._sending = False
         self._clock_path = "/config/pixelart/clock.gif"
         os.makedirs("/config/pixelart", exist_ok=True)
 
@@ -296,6 +297,9 @@ class PixooClockLight(LightEntity):
 
     async def _update_pixoo(self) -> None:
         """Render the clock and push to the Pixoo."""
+        if self._sending:
+            return
+
         now = datetime.now()
         factor = self._brightness / 255.0
         current_color = (
@@ -311,6 +315,10 @@ class PixooClockLight(LightEntity):
         self._last_second = now.second
         self._last_color = current_color
 
+        domain, service = self._notify_service.split(".", 1)
+        if not self._hass.services.has_service(domain, service):
+            return
+
         # Render off the event loop
         img = await self._hass.async_add_executor_job(
             render_clock,
@@ -323,8 +331,13 @@ class PixooClockLight(LightEntity):
         )
         await self._hass.async_add_executor_job(img.save, self._clock_path)
 
-        # Push to the Pixoo via hass-divoom
-        domain, service = self._notify_service.split(".", 1)
-        await self._hass.services.async_call(
-            domain, service, {"message": "image", "data": {"file": "clock.gif"}}
-        )
+        # Push to the Pixoo via hass-divoom, skip if previous send still in flight
+        self._sending = True
+        try:
+            await self._hass.services.async_call(
+                domain, service, {"message": "image", "data": {"file": "clock.gif"}}
+            )
+        except Exception:
+            _LOGGER.debug("Failed to send clock frame, will retry next tick")
+        finally:
+            self._sending = False
